@@ -11,8 +11,8 @@ class SelectDeviceTypeScript(Script):
         label="Device Type",
         model=DeviceType,
         query_params={"manufacturer": ["socomec", "eaton"]},
-        description="Waehle einen DeviceType von Socomec oder Eaton",
+        description="Wähle einen DeviceType von Socomec oder Eaton",
     )
 
     def run(self, data, commit):
-        self.log_success(f"Ausgewaehlter DeviceType: {data['device_type']}")
+        self.log_success(f"Ausgewählter DeviceType: {data['device_type']}")

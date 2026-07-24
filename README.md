@@ -116,8 +116,8 @@ Verfügbare Variablen in den Templates:
 | `device_role`      | Geräterolle (z. B. Router, Switch)                |
 | `primary_ip4`      | Primäre IPv4-Adresse                              |
 | `interfaces`       | Liste der Interfaces mit IPs (enriched mode)      |
-| `management_vlan_id` | Management-VLAN aus einem NetBox-Interface wie `Vlanif12` (Huawei, enriched mode; leer ohne passendes `Vlanif*`) |
-| `management_ip4`   | Management-IP aus dem passenden NetBox-`Vlanif*`-Interface (Huawei, enriched mode) |
+| `management_vlan_id` | Management-VLAN aus dem ersten passenden NetBox-Interface wie `Vlanif12` (Huawei, enriched mode; leer ohne passendes `Vlanif*`) |
+| `management_ip4`   | Management-IP aus dem ersten passenden NetBox-`Vlanif*`-Interface (Huawei, enriched mode) |
 | `ntp_servers`      | NTP-Server (aus `group_vars/all.yml`)             |
 | `dns_servers`      | DNS-Server (aus `group_vars/all.yml`)             |
 | `snmp_*`           | SNMP-Einstellungen (aus `group_vars/all.yml`)     |

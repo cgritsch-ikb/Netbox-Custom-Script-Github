@@ -162,7 +162,7 @@ interface Vlanif{{ management_vlan_id }}
 {% endif %}
 {% if interfaces is defined %}
 {% for iface in interfaces %}
-{% set is_management_interface = management_interface_name | default('') | length > 0 and management_interface_name == iface.name %}
+{% set is_management_interface = management_interface_name | default('') == iface.name and management_interface_name | default('') | length > 0 %}
 {% if not is_management_interface %}
 {% set iface_description = iface.description | default('') %}
 {% set vlan_range = iface.custom_fields.vlan_range | default('', true) | string | trim %}

@@ -1,0 +1,133 @@
+---
+# tasks/generate_single_device.yml
+# Fetches interface data for a single device and generates its config.
+# Called with loop variable "device" from the parent playbook.
+
+- name: "{{ device.name }} – fetch interfaces from Netbox"
+  ansible.builtin.uri:
+    url: "{{ netbox_url }}/api/dcim/interfaces/?device_id={{ device.id }}&limit=500"
+    method: GET
+    headers:
+      Authorization: "Token {{ netbox_api_token }}"
+      Accept: "application/json"
+    validate_certs: false
+  register: iface_raw
+
+- name: "{{ device.name }} – fetch IP addresses from Netbox"
+  ansible.builtin.uri:
+    url: "{{ netbox_url }}/api/ipam/ip-addresses/?device={{ device.name }}&limit=500"
+    method: GET
+    headers:
+      Authorization: "Token {{ netbox_api_token }}"
+      Accept: "application/json"
+    validate_certs: false
+  register: ip_raw
+
+- name: "{{ device.name }} – build enriched interface list"
+  ansible.builtin.set_fact:
+    # Build a lookup dict { interface_name: [ip, ...] } in one pass, then merge.
+    _ip_by_iface: >-
+      {{
+        ip_raw.json.results
+        | selectattr('assigned_object', 'defined')
+        | selectattr('assigned_object.name', 'defined')
+        | groupby('assigned_object.name')
+        | items2dict(key_name=0, value_name=1)
+      }}
+
+- name: "{{ device.name }} – initialize interface result list"
+  ansible.builtin.set_fact:
+    device_interfaces: []
+
+- name: "{{ device.name }} – attach IPs to interfaces"
+  ansible.builtin.set_fact:
+    device_interfaces: "{{ device_interfaces + [ item | combine({'ip_addresses': _ip_by_iface.get(item.name, [])}) ] }}"
+  loop: "{{ iface_raw.json.results }}"
+  loop_control:
+    loop_var: item
+    label: "{{ item.name }}"
+
+- name: "{{ device.name }} – derive Huawei management interface data"
+  ansible.builtin.set_fact:
+    _management_interface: >-
+      {{
+        (
+          device_interfaces
+          | selectattr('name', 'match', '^Vlanif[0-9]+$')
+          | list
+          | first
+        ) | default({}, true)
+      }}
+
+- name: "{{ device.name }} – derive Huawei management IP fallback"
+  ansible.builtin.set_fact:
+    _fallback_management_ip4: "{{ device.primary_ip4 | default(device.primary_ip, true) | default('', true) }}"
+    _management_vlan_id_raw: "{{ _management_interface.name | regex_replace('^Vlanif', '') if _management_interface.name is defined else '' }}"
+
+- name: "{{ device.name }} – derive Huawei management VLAN and IP"
+  ansible.builtin.set_fact:
+    management_interface_name: >-
+      {{
+        _management_interface.name
+        if (
+          _management_interface.name is defined
+          and _management_vlan_id_raw | length > 0
+          and (_management_vlan_id_raw | int) >= 1
+          and (_management_vlan_id_raw | int) <= 4094
+        )
+        else ''
+      }}
+    management_vlan_id: >-
+      {{
+        _management_vlan_id_raw
+        if (
+          _management_vlan_id_raw | length > 0
+          and (_management_vlan_id_raw | int) >= 1
+          and (_management_vlan_id_raw | int) <= 4094
+        )
+        else ''
+      }}
+    management_vlan_description: >-
+      {{ _management_interface.description | default('', true) }}
+    management_ip4: >-
+      {{
+        (_management_interface.ip_addresses | first)
+        if (_management_interface.ip_addresses | default([]) | length > 0)
+        else _fallback_management_ip4
+      }}
+
+- name: "{{ device.name }} – generate Cisco config"
+  ansible.builtin.template:
+    src: "{{ playbook_dir }}/../templates/cisco/base_config.j2"
+    dest: "{{ config_output_dir }}/{{ device.name }}.cfg"
+    mode: "0644"
+  vars:
+    inventory_hostname: "{{ device.name }}"
+    platform: "{{ device.platform.name | default('IOS') }}"
+    site: "{{ device.site.name | default('N/A') }}"
+    device_role: "{{ device.role.name | default(device.device_role.name | default('N/A')) }}"
+    primary_ip4: "{{ device.primary_ip4 | default(device.primary_ip) }}"
+    interfaces: "{{ device_interfaces }}"
+    ansible_date_time:
+      iso8601: "{{ lookup('pipe', 'date -u +\"%Y-%m-%dT%H:%M:%SZ\"') }}"
+  when: device.device_type.manufacturer.name | lower is search('cisco')
+
+- name: "{{ device.name }} – generate Huawei config"
+  ansible.builtin.template:
+    src: "{{ playbook_dir }}/../templates/huawei/base_config.j2"
+    dest: "{{ config_output_dir }}/{{ device.name }}.cfg"
+    mode: "0644"
+  vars:
+    inventory_hostname: "{{ device.name }}"
+    platform: "{{ device.platform.name | default('VRP') }}"
+    site: "{{ device.site.name | default('N/A') }}"
+    device_role: "{{ device.role.name | default(device.device_role.name | default('N/A')) }}"
+    primary_ip4: "{{ device.primary_ip4 | default(device.primary_ip) }}"
+    interfaces: "{{ device_interfaces }}"
+    management_interface_name: "{{ management_interface_name }}"
+    management_vlan_id: "{{ management_vlan_id }}"
+    management_vlan_description: "{{ management_vlan_description }}"
+    management_ip4: "{{ management_ip4 }}"
+    ansible_date_time:
+      iso8601: "{{ lookup('pipe', 'date -u +\"%Y-%m-%dT%H:%M:%SZ\"') }}"
+  when: device.device_type.manufacturer.name | lower is search('huawei')

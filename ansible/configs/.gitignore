@@ -1,0 +1,3 @@
+# Generated device configurations – not committed to version control
+*.cfg
+!.gitkeep

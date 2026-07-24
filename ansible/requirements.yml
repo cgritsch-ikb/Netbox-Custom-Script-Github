@@ -1,0 +1,8 @@
+---
+collections:
+  - name: netbox.netbox
+    version: ">=3.20.0"
+  - name: ansible.utils
+    version: ">=2.10.0"
+  - name: cisco.ios
+    version: ">=4.0.0"

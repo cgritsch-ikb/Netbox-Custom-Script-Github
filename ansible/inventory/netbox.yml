@@ -1,0 +1,39 @@
+---
+# Netbox dynamic inventory plugin configuration
+# Docs: https://docs.ansible.com/ansible/latest/collections/netbox/netbox/nb_inventory_inventory.html
+
+plugin: netbox.netbox.nb_inventory
+
+# Netbox connection – set via environment variables or override here:
+#   NETBOX_API   = https://netbox.example.com
+#   NETBOX_TOKEN = <your-api-token>
+api_endpoint: "{{ lookup('env', 'NETBOX_API') | default('http://netbox.example.com', true) }}"
+token: "{{ lookup('env', 'NETBOX_TOKEN') | default('YOUR_NETBOX_TOKEN', true) }}"
+
+# Only fetch devices that are active
+device_query_filters:
+  - status: "active"
+  - role: "mpls-cpe"
+
+# Pull additional fields from Netbox
+fetch_all: false
+interfaces: true
+services: false
+virtual_chassis_master_as_hostname: true
+
+# Group devices by manufacturer (gives groups like "manufacturer_cisco", "manufacturer_huawei")
+group_by:
+  - manufacturer
+  - site
+  - role
+  - platform
+
+# Expose these device custom fields as host variables
+compose:
+  ansible_host: "primary_ip4.address | ansible.utils.ipaddr('address')"
+
+# Only include devices that have a primary IPv4 set
+query_filters:
+  - has_primary_ip: true
+
+validate_certs: false

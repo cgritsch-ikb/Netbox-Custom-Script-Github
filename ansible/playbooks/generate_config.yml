@@ -138,7 +138,7 @@
 #         mode: "0755"
 #
 #     - name: Fetch interfaces and generate config per device
-#       include_tasks: tasks/generate_single_device.yml
+#       include_tasks: "{{ playbook_dir }}/../tasks/generate_single_device.yml"
 #       loop: "{{ netbox_devices }}"
 #       loop_control:
 #         loop_var: device

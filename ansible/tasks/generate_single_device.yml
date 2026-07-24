@@ -59,19 +59,19 @@
         ) | default({}, true)
       }}
 
+- name: "{{ device.name }} – derive Huawei management IP fallback"
+  ansible.builtin.set_fact:
+    _fallback_management_ip4: "{{ device.primary_ip4 | default(device.primary_ip | default('', true), true) }}"
+
 - name: "{{ device.name }} – derive Huawei management VLAN and IP"
   ansible.builtin.set_fact:
     management_interface_name: "{{ _management_interface.name | default('', true) }}"
-    management_vlan_id: "{{ (_management_interface.name | default('', true)) | regex_replace('^Vlanif', '') }}"
+    management_vlan_id: "{{ _management_interface.name | regex_replace('^Vlanif', '') if _management_interface.name is defined else '' }}"
     management_vlan_description: >-
       {{ _management_interface.description | default('', true) }}
     management_ip4: >-
       {{
-        (
-          _management_interface.ip_addresses
-          | default([])
-          | first
-        ) | default(device.primary_ip4 | default(device.primary_ip | default('', true), true), true)
+        (_management_interface.ip_addresses | default([]) | first) | default(_fallback_management_ip4, true)
       }}
 
 - name: "{{ device.name }} – generate Cisco config"

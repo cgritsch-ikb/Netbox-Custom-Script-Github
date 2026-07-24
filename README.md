@@ -130,7 +130,7 @@ Verfügbare Variablen in den Templates:
 Standardmäßig werden Interfaces als leere Liste übergeben.  
 Um Interface-Details (inklusive IP-Adressen) in die Konfiguration aufzunehmen,  
 den zweiten Play in `playbooks/generate_config.yml` auskommentieren (den mit `include_tasks: tasks/generate_single_device.yml`).  
-Dies erzeugt einen zusätzlichen API-Aufruf pro Gerät. Bei Huawei werden dabei auch
+Dies erzeugt zwei zusätzliche API-Aufrufe pro Gerät. Bei Huawei werden dabei auch
 Management-VLAN und Management-IP aus einem NetBox-Interface wie `Vlanif12`
 abgeleitet. Wenn kein passendes `Vlanif*` vorhanden ist, bleibt die
 Management-VLAN leer.

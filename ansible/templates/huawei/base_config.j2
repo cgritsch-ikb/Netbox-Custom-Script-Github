@@ -162,7 +162,8 @@ interface Vlanif{{ management_vlan_id }}
 {% endif %}
 {% if interfaces is defined %}
 {% for iface in interfaces %}
-{% if management_interface_name | default('') != iface.name %}
+{% set is_management_interface = management_interface_name | default('') | length > 0 and management_interface_name == iface.name %}
+{% if not is_management_interface %}
 {% set iface_description = iface.description | default('') %}
 {% set vlan_range = iface.custom_fields.vlan_range | default('', true) | string | trim %}
 interface {{ iface.name }}
@@ -171,7 +172,7 @@ interface {{ iface.name }}
 {% endif %}
 {% if iface_description is match('^Cust') %}
  port link-type dot1q-tunnel
-{% if vlan_range is match('^[0-9]+$') %}
+{% if vlan_range is match('^[0-9]+$') and (vlan_range | int) >= 1 and (vlan_range | int) <= 4094 %}
  port default vlan {{ vlan_range }}
 {% endif %}
 {% elif iface_description is match('^Uplink') %}

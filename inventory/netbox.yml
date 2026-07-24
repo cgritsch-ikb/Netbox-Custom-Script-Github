@@ -1,0 +1,18 @@
+plugin: netbox.netbox.nb_inventory
+
+api_endpoint: "{{ lookup('env', 'NETBOX_API') }}"
+token: "{{ lookup('env', 'NETBOX_TOKEN') }}"
+validate_certs: false
+
+query_filters:
+  - status: active
+  - has_primary_ip: 'true'
+  - role: mpls-cpe
+
+compose:
+  ansible_host: primary_ip.address | ipaddr('address')
+
+group_by:
+  - manufacturers
+  - device_roles
+  - sites

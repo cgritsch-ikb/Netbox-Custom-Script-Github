@@ -49,44 +49,29 @@
 
 - name: "{{ device.name }} – derive Huawei management interface data"
   ansible.builtin.set_fact:
-    management_interface_name: >-
+    _management_interface: >-
       {{
         (
           device_interfaces
           | selectattr('name', 'match', '^Vlanif[0-9]+$')
-          | map(attribute='name')
+          | list
           | first
-        ) | default('', true)
+        ) | default({}, true)
       }}
-    management_vlan_id: >-
-      {{
-        (
-          (
-            device_interfaces
-            | selectattr('name', 'match', '^Vlanif[0-9]+$')
-            | map(attribute='name')
-            | first
-          ) | default('', true)
-        ) | regex_replace('^Vlanif', '')
-      }}
+
+- name: "{{ device.name }} – derive Huawei management VLAN and IP"
+  ansible.builtin.set_fact:
+    management_interface_name: "{{ _management_interface.name | default('', true) }}"
+    management_vlan_id: "{{ (_management_interface.name | default('', true)) | regex_replace('^Vlanif', '') }}"
     management_vlan_description: >-
-      {{
-        (
-          device_interfaces
-          | selectattr('name', 'match', '^Vlanif[0-9]+$')
-          | map(attribute='description')
-          | first
-        ) | default('', true)
-      }}
+      {{ _management_interface.description | default('', true) }}
     management_ip4: >-
       {{
         (
-          device_interfaces
-          | selectattr('name', 'match', '^Vlanif[0-9]+$')
-          | map(attribute='ip_addresses')
-          | map('first')
+          _management_interface.ip_addresses
+          | default([])
           | first
-        ) | default(device.primary_ip4 | default(device.primary_ip), true)
+        ) | default(device.primary_ip4 | default(device.primary_ip | default('', true), true), true)
       }}
 
 - name: "{{ device.name }} – generate Cisco config"

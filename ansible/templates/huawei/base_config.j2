@@ -35,12 +35,6 @@ access-user dot1x-identity speed-limit 80
 drop-profile default
 #
 #
-{% if management_vlan_id %}
-vlan {{ management_vlan_id }}
-#
-interface Vlanif{{ management_vlan_id }}
-{% endif %}
-#
 ntp server disable
 ntp ipv6 server disable
 ntp server source-interface all disable
@@ -168,7 +162,7 @@ interface Vlanif{{ management_vlan_id }}
 {% endif %}
 {% if interfaces is defined %}
 {% for iface in interfaces %}
-{% if not management_interface_name or iface.name != management_interface_name %}
+{% if management_interface_name | default('') != iface.name %}
 interface {{ iface.name }}
 {% if iface.description is defined and iface.description | length > 0 %}
  description {{ iface.description }}

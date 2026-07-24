@@ -47,6 +47,48 @@
     loop_var: item
     label: "{{ item.name }}"
 
+- name: "{{ device.name }} – derive Huawei management interface data"
+  ansible.builtin.set_fact:
+    management_interface_name: >-
+      {{
+        (
+          device_interfaces
+          | selectattr('name', 'match', '^Vlanif[0-9]+$')
+          | map(attribute='name')
+          | first
+        ) | default('', true)
+      }}
+    management_vlan_id: >-
+      {{
+        (
+          (
+            device_interfaces
+            | selectattr('name', 'match', '^Vlanif[0-9]+$')
+            | map(attribute='name')
+            | first
+          ) | default('', true)
+        ) | regex_replace('^Vlanif', '')
+      }}
+    management_vlan_description: >-
+      {{
+        (
+          device_interfaces
+          | selectattr('name', 'match', '^Vlanif[0-9]+$')
+          | map(attribute='description')
+          | first
+        ) | default('', true)
+      }}
+    management_ip4: >-
+      {{
+        (
+          device_interfaces
+          | selectattr('name', 'match', '^Vlanif[0-9]+$')
+          | map(attribute='ip_addresses')
+          | map('first')
+          | first
+        ) | default(device.primary_ip4 | default(device.primary_ip), true)
+      }}
+
 - name: "{{ device.name }} – generate Cisco config"
   ansible.builtin.template:
     src: "{{ playbook_dir }}/../templates/cisco/base_config.j2"
@@ -75,6 +117,10 @@
     device_role: "{{ device.role.name | default(device.device_role.name | default('N/A')) }}"
     primary_ip4: "{{ device.primary_ip4 | default(device.primary_ip) }}"
     interfaces: "{{ device_interfaces }}"
+    management_interface_name: "{{ management_interface_name }}"
+    management_vlan_id: "{{ management_vlan_id }}"
+    management_vlan_description: "{{ management_vlan_description }}"
+    management_ip4: "{{ management_ip4 }}"
     ansible_date_time:
       iso8601: "{{ lookup('pipe', 'date -u +\"%Y-%m-%dT%H:%M:%SZ\"') }}"
   when: device.device_type.manufacturer.name | lower is search('huawei')

@@ -1,57 +1,177 @@
+pki realm default
 #
-# ============================================================
-# Huawei VRP Base Configuration
-# Device  : {{ inventory_hostname }}
-# Platform: {{ platform | default('VRP') }}
-# Site    : {{ site | default('N/A') }}
-# Role    : {{ device_role | default('N/A') }}
-# Generated: {{ ansible_date_time.iso8601 | default('') }}
-# ============================================================
+clock timezone Vienna add 01:00:00
+clock daylight-saving-time Vienna repeating 02:00 last Sun Mar 03:00 last Sun Oct 01:00
 #
 sysname {{ inventory_hostname }}
 #
-! ── DNS ─────────────────────────────────────────────────────────
-{% if dns_servers is defined and dns_servers | length > 0 %}
+undo ftp server source all-interface
+undo ftp ipv6 server source all-interface
+#
+ssl policy default
+ pki-domain default
+ ssl minimum version tls1.2
+ cipher-suite exclude key-exchange rsa
+ cipher-suite exclude cipher mode cbc
+ cipher-suite exclude hmac sha1
+ diffie-hellman modulus 3072
+ ecdh group curve brainpool
+ signature algorithm-list ed25519 ed448 rsa-pss-pss-sha256 rsa-pss-pss-sha384 rsa-pss-pss-sha512 rsa-pss-rsae-sha256 rsa-pss-rsae-sha384 rsa-pss-rsae-sha512
+#
+transceiver non-certified-alarm disable
+#
+# Optional board-type, can be overridden in group_vars/host_vars
+{% if huawei_board_type is defined %}
+device board 1 board-type {{ huawei_board_type }}
+#
+{% endif %}
+authentication-profile name default_authen_profile
+authentication-profile name dot1x_authen_profile
+authentication-profile name dot1xmac_authen_profile
+authentication-profile name mac_authen_profile
+#
+access-user dot1x-identity speed-limit 80
+#
+drop-profile default
+#
+#
+{% if management_vlan_id is defined %}
+vlan {{ management_vlan_id }}
+#
+interface Vlanif{{ management_vlan_id }}
+{% endif %}
+#
+ntp server disable
+ntp ipv6 server disable
+ntp server source-interface all disable
+ntp ipv6 server source-interface all disable
+{% if ntp_servers is defined and ntp_servers | length > 0 %}
+ntp unicast-server {{ ntp_servers[0] }}
+{% endif %}
+{% if management_vlan_id is defined %}
+ntp server source-interface Vlanif{{ management_vlan_id }}
+{% endif %}
+#
+{% if vlan_batch is defined and vlan_batch | length > 0 %}
+vlan batch {{ vlan_batch | join(' ') }}
+#
+{% endif %}
+drop illegal-mac enable
+#
+l2protocol-tunnel lldp group-mac 0100-0ccd-cdd0
+l2protocol-tunnel vtp group-mac 0100-0ccd-cdd0
+l2protocol-tunnel cdp group-mac 0100-0ccd-cdd0
+#
+error-down auto-recovery cause bpdu-protection interval 180
+error-down auto-recovery cause storm-control interval 180
+error-down auto-recovery cause mac-address-flapping interval 180
+error-down auto-recovery cause transceiver-power-low interval 180
+error-down auto-recovery cause link-flap interval 180
+#
 dns resolve
+{% if dns_servers is defined %}
 {% for dns in dns_servers %}
 dns server {{ dns }}
 {% endfor %}
 {% endif %}
 #
-! ── NTP ─────────────────────────────────────────────────────────
-{% if ntp_servers is defined %}
-ntp-service unicast-server {{ ntp_servers[0] }} preference
-{% if ntp_servers | length > 1 %}
-ntp-service unicast-server {{ ntp_servers[1] }}
-{% endif %}
-{% endif %}
+info-center loghost domain {{ syslog_domain | default('syslog.ikbnet.internal') }} local-time port 514 transport udp
 #
-! ── SNMP ────────────────────────────────────────────────────────
-snmp-agent
-snmp-agent community read {{ snmp_community_ro }}
-snmp-agent sys-info location {{ snmp_location }}
-snmp-agent sys-info contact {{ snmp_contact }}
-snmp-agent trap enable
-{% if syslog_server is defined %}
+undo telnet server-source all-interface
+undo telnet ipv6 server-source all-interface
 #
-! ── Logging / Information-Center ────────────────────────────────
-info-center enable
-info-center loghost {{ syslog_server }} facility local7
-info-center source default channel loghost log state on warning on
+mac-address update arp enable
+#
+qos schedule-profile default
+#
+diffserv domain default
+#
+ip vpn-instance _management_vpn_
+ ipv4-family
+#
+{% if management_vlan_id is defined %}
+vlan {{ management_vlan_id }}
+ name management
+#
 {% endif %}
+{% if service_vlan_id is defined and service_vlan_name is defined %}
+vlan {{ service_vlan_id }}
+ name {{ service_vlan_name }}
 #
-! ── Management interface ─────────────────────────────────────────
+{% endif %}
+acl name SNMP number 2001
+ rule 5 permit source 10.12.100.241 0
+ rule 6 permit source 10.100.1.80 0.0.0.15
+ rule 10 deny
+#
+acl name management number 2002
+ rule 5 permit source 10.1.2.0 0.0.0.255
+ rule 10 permit source 10.1.4.0 0.0.0.255
+ rule 15 permit source 10.10.0.0 0.0.0.255
+ rule 20 permit source 10.11.0.0 0.0.0.255
+ rule 25 permit source 10.12.0.0 0.0.0.255
+ rule 30 permit source 10.12.100.0 0.0.0.255
+ rule 35 permit source 10.12.110.0 0.0.0.255
+ rule 40 permit source 10.100.1.80 0.0.0.15
+ rule 55 deny
+#
+radius-server template IKB
+ radius-server shared-key cipher {{ radius_shared_key_cipher | default('CHANGE_ME') }}
+ radius-server accounting 10.1.2.52 1813 weight 80
+ radius-server authentication 10.1.2.52 1812 weight 80
+#
+aaa
+ authentication-scheme default
+  authentication-mode local
+ authentication-scheme ikb-auth-scheme
+  authentication-mode radius local
+ authentication-scheme radius
+  authentication-mode radius
+ authorization-scheme default
+  authorization-mode local
+ accounting-scheme default
+  accounting-mode none
+ local-aaa-user password policy administrator
+  password complexity two-of-kinds
+ domain default
+  authentication-scheme ikb-auth-scheme
+  accounting-scheme default
+  radius-server IKB
+ domain default_admin
+  authentication-scheme ikb-auth-scheme
+  accounting-scheme default
+  radius-server IKB
+ local-aaa-user user-name complexity-check disable
+ local-user root password irreversible-cipher {{ local_root_password_cipher | default('CHANGE_ME') }}
+ local-user root password-force-change disable
+ local-user root privilege level 3
+ local-user root service-type telnet terminal ssh
+#
+free-rule-template name default_free_rule
+#
+#
+dot1x-access-profile name dot1x_access_profile
+#
+mac-access-profile name mac_access_profile
+#
+stack
+#
+license
+#
+{% if management_vlan_id is defined %}
+interface Vlanif{{ management_vlan_id }}
+ description {{ management_vlan_description | default('Mgmt-Mpls-Cpe') }}
 {% if primary_ip4 is defined %}
-interface LoopBack0
- description Management-Loopback
  ip address {{ primary_ip4.address | ansible.utils.ipaddr('address') }} {{ primary_ip4.address | ansible.utils.ipaddr('netmask') }}
+{% endif %}
 #
 {% endif %}
-! ── Interfaces from Netbox ───────────────────────────────────────
 {% if interfaces is defined %}
 {% for iface in interfaces %}
 interface {{ iface.name }}
- description {{ iface.description | default('') }}
+{% if iface.description is defined and iface.description | length > 0 %}
+ description {{ iface.description }}
+{% endif %}
 {% if not iface.enabled %}
  shutdown
 {% else %}
@@ -65,18 +185,83 @@ interface {{ iface.name }}
 #
 {% endfor %}
 {% endif %}
-! ── SSH ──────────────────────────────────────────────────────────
-stelnet server enable
-ssh server-source all-interface
-ssh user {{ ansible_user }} authentication-type password
-ssh user {{ ansible_user }} service-type stelnet
+interface NULL0
+#
+{% if default_gateway is defined %}
+ip route-static 0.0.0.0 0.0.0.0 {{ default_gateway }}
+#
+{% endif %}
+snmp-agent
+snmp-agent community complexity-check disable
+snmp-agent community read {{ snmp_community_ro }} acl 2001 alias IKB-SNMP-Community
+#
+snmp-agent sys-info contact {{ snmp_contact }}
+snmp-agent sys-info location {{ site | default('Unknown') }}
+snmp-agent sys-info version v3
+snmp-agent group v3 admin privacy
+#
+snmp-agent usm-user v3 {{ snmpv3_user | default('ikbnoc') }}
+snmp-agent usm-user v3 {{ snmpv3_user | default('ikbnoc') }} group admin
+snmp-agent usm-user v3 {{ snmpv3_user | default('ikbnoc') }} authentication-mode sha
+{{ snmpv3_auth_pass | default('CHANGE_ME') }}
+{{ snmpv3_auth_pass | default('CHANGE_ME') }}
+snmp-agent usm-user v3 {{ snmpv3_user | default('ikbnoc') }} privacy-mode aes128
+{{ snmpv3_priv_pass | default('CHANGE_ME') }}
+{{ snmpv3_priv_pass | default('CHANGE_ME') }}
+snmp-agent usm-user v3 {{ snmpv3_user | default('ikbnoc') }} acl 2001
+#
+{% if management_vlan_id is defined %}
+snmp-agent protocol source-interface Vlanif{{ management_vlan_id }}
+{% endif %}
+undo snmp-agent protocol source-status all-interface
+undo snmp-agent protocol source-status ipv6 all-interface
+#
+undo snmp-agent proxy protocol source-status all-interface
+undo snmp-agent proxy protocol source-status ipv6 all-interface
+#
+#
+stelnet ipv4 server enable
+{% if management_vlan_id is defined %}
+ssh server-source -i Vlanif{{ management_vlan_id }}
+{% endif %}
+undo ssh server-source all-interface
+undo ssh ipv6 server-source all-interface
+ssh authorization-type default aaa
+#
+ssh server cipher aes256_gcm aes128_gcm aes256_ctr aes192_ctr aes128_ctr
+ssh server hmac sha2_512 sha2_256
+ssh server key-exchange dh_group1_sha1
+#
+ssh server publickey rsa rsa_sha2_256 rsa_sha2_512
+#
+ssh server dh-exchange min-len 3072
+#
+ssh client publickey rsa_sha2_256 rsa_sha2_512
+#
+ssh client cipher aes256_gcm aes128_gcm aes256_ctr aes192_ctr aes128_ctr
+ssh client hmac sha2_512 sha2_256
+ssh client key-exchange dh_group_exchange_sha256 dh_group16_sha512 curve25519_sha256
+#
+header login information "
+*************************************************
+***********************
+EIGENTUM IKB AG!!!!!
+ZUGRIFF VERBOTEN!!!!
+***********************
+*************************************************
+"
+#
+user-interface con 0
+ authentication-mode aaa
 #
 user-interface vty 0 4
- protocol inbound ssh
+ acl 2002 inbound
  authentication-mode aaa
- idle-timeout 10 0
+ user privilege level 3
+ idle-timeout 5 0
+ protocol inbound ssh
 #
-user-interface console 0
- idle-timeout 10 0
+undo web-manager enable
+web-manager http forward enable
 #
-return
+warranty

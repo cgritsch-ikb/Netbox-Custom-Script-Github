@@ -35,24 +35,17 @@
         | items2dict(key_name=0, value_name=1)
       }}
 
+- name: "{{ device.name }} – initialize interface result list"
+  ansible.builtin.set_fact:
+    device_interfaces: []
+
 - name: "{{ device.name }} – attach IPs to interfaces"
   ansible.builtin.set_fact:
-    device_interfaces: >-
-      {{
-        iface_raw.json.results | map('combine', {
-          'ip_addresses': _ip_by_iface.get(item.name, [])
-        }) | list
-      }}
+    device_interfaces: "{{ device_interfaces + [ item | combine({'ip_addresses': _ip_by_iface.get(item.name, [])}) ] }}"
   loop: "{{ iface_raw.json.results }}"
   loop_control:
     loop_var: item
     label: "{{ item.name }}"
-  # Collapse loop results into a flat list
-  register: _iface_build
-
-- name: "{{ device.name }} – flatten interface list"
-  ansible.builtin.set_fact:
-    device_interfaces: "{{ _iface_build.results | map(attribute='ansible_facts.device_interfaces') | flatten | unique(attribute='name') | list }}"
 
 - name: "{{ device.name }} – generate Cisco config"
   ansible.builtin.template:
@@ -63,8 +56,8 @@
     inventory_hostname: "{{ device.name }}"
     platform: "{{ device.platform.name | default('IOS') }}"
     site: "{{ device.site.name | default('N/A') }}"
-    device_role: "{{ device.device_role.name | default('N/A') }}"
-    primary_ip4: "{{ device.primary_ip4 }}"
+    device_role: "{{ device.role.name | default(device.device_role.name | default('N/A')) }}"
+    primary_ip4: "{{ device.primary_ip4 | default(device.primary_ip) }}"
     interfaces: "{{ device_interfaces }}"
     ansible_date_time:
       iso8601: "{{ lookup('pipe', 'date -u +\"%Y-%m-%dT%H:%M:%SZ\"') }}"
@@ -79,8 +72,8 @@
     inventory_hostname: "{{ device.name }}"
     platform: "{{ device.platform.name | default('VRP') }}"
     site: "{{ device.site.name | default('N/A') }}"
-    device_role: "{{ device.device_role.name | default('N/A') }}"
-    primary_ip4: "{{ device.primary_ip4 }}"
+    device_role: "{{ device.role.name | default(device.device_role.name | default('N/A')) }}"
+    primary_ip4: "{{ device.primary_ip4 | default(device.primary_ip) }}"
     interfaces: "{{ device_interfaces }}"
     ansible_date_time:
       iso8601: "{{ lookup('pipe', 'date -u +\"%Y-%m-%dT%H:%M:%SZ\"') }}"

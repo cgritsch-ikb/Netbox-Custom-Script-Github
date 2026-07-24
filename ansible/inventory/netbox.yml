@@ -13,6 +13,7 @@ token: "{{ lookup('env', 'NETBOX_TOKEN') | default('YOUR_NETBOX_TOKEN', true) }}
 # Only fetch devices that are active
 device_query_filters:
   - status: "active"
+  - role: "mpls-cpe"
 
 # Pull additional fields from Netbox
 fetch_all: false
@@ -24,7 +25,7 @@ virtual_chassis_master_as_hostname: true
 group_by:
   - manufacturer
   - site
-  - device_role
+  - role
   - platform
 
 # Expose these device custom fields as host variables

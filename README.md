@@ -116,7 +116,7 @@ Verfügbare Variablen in den Templates:
 | `device_role`      | Geräterolle (z. B. Router, Switch)                |
 | `primary_ip4`      | Primäre IPv4-Adresse                              |
 | `interfaces`       | Liste der Interfaces mit IPs (enriched mode)      |
-| `management_vlan_id` | Management-VLAN aus einem Netbox-Interface wie `Vlanif12` (Huawei, enriched mode) |
+| `management_vlan_id` | Management-VLAN aus einem Netbox-Interface wie `Vlanif12` (Huawei, enriched mode; leer ohne passendes `Vlanif*`) |
 | `management_ip4`   | Management-IP aus dem passenden Netbox-`Vlanif*`-Interface (Huawei, enriched mode) |
 | `ntp_servers`      | NTP-Server (aus `group_vars/all.yml`)             |
 | `dns_servers`      | DNS-Server (aus `group_vars/all.yml`)             |
@@ -132,4 +132,5 @@ Um Interface-Details (inklusive IP-Adressen) in die Konfiguration aufzunehmen,
 den zweiten Play in `playbooks/generate_config.yml` auskommentieren (den mit `include_tasks: tasks/generate_single_device.yml`).  
 Dies erzeugt einen zusätzlichen API-Aufruf pro Gerät. Bei Huawei werden dabei auch
 Management-VLAN und Management-IP aus einem Netbox-Interface wie `Vlanif12`
-abgeleitet.
+abgeleitet. Wenn kein passendes `Vlanif*` vorhanden ist, bleibt die
+Management-VLAN leer.

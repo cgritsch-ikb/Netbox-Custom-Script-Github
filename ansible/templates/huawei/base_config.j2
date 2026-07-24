@@ -42,7 +42,7 @@ ntp ipv6 server source-interface all disable
 {% if ntp_servers is defined and ntp_servers | length > 0 %}
 ntp unicast-server {{ ntp_servers[0] }}
 {% endif %}
-{% if management_vlan_id %}
+{% if management_vlan_id | default('') | length > 0 %}
 ntp server source-interface Vlanif{{ management_vlan_id }}
 {% endif %}
 #
@@ -83,7 +83,7 @@ diffserv domain default
 ip vpn-instance _management_vpn_
  ipv4-family
 #
-{% if management_vlan_id %}
+{% if management_vlan_id | default('') | length > 0 %}
 vlan {{ management_vlan_id }}
  name management
 #
@@ -152,7 +152,7 @@ stack
 #
 license
 #
-{% if management_vlan_id %}
+{% if management_vlan_id | default('') | length > 0 %}
 interface Vlanif{{ management_vlan_id }}
  description {{ management_vlan_description | default('Mgmt-Mpls-Cpe') }}
 {% if management_ip4 is defined %}
@@ -163,9 +163,22 @@ interface Vlanif{{ management_vlan_id }}
 {% if interfaces is defined %}
 {% for iface in interfaces %}
 {% if management_interface_name | default('') != iface.name %}
+{% set iface_description = iface.description | default('') %}
+{% set vlan_range = iface.custom_fields.vlan_range | default('', true) | string | trim %}
 interface {{ iface.name }}
-{% if iface.description is defined and iface.description | length > 0 %}
- description {{ iface.description }}
+{% if iface_description | length > 0 %}
+ description {{ iface_description }}
+{% endif %}
+{% if iface_description is match('^Cust') %}
+ port link-type dot1q-tunnel
+{% if vlan_range is match('^[0-9]+$') %}
+ port default vlan {{ vlan_range }}
+{% endif %}
+{% elif iface_description is match('^Uplink') %}
+ port link-type trunk
+{% if vlan_range | length > 0 %}
+ port trunk allow-pass vlan {{ vlan_range }}
+{% endif %}
 {% endif %}
 {% if not iface.enabled %}
  shutdown
@@ -206,7 +219,7 @@ snmp-agent usm-user v3 {{ snmpv3_user | default('ikbnoc') }} privacy-mode aes128
 {{ snmpv3_priv_pass | default('CHANGE_ME') }}
 snmp-agent usm-user v3 {{ snmpv3_user | default('ikbnoc') }} acl 2001
 #
-{% if management_vlan_id %}
+{% if management_vlan_id | default('') | length > 0 %}
 snmp-agent protocol source-interface Vlanif{{ management_vlan_id }}
 {% endif %}
 undo snmp-agent protocol source-status all-interface
@@ -217,7 +230,7 @@ undo snmp-agent proxy protocol source-status ipv6 all-interface
 #
 #
 stelnet ipv4 server enable
-{% if management_vlan_id %}
+{% if management_vlan_id | default('') | length > 0 %}
 ssh server-source -i Vlanif{{ management_vlan_id }}
 {% endif %}
 undo ssh server-source all-interface

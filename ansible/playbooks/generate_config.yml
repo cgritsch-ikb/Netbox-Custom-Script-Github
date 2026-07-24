@@ -71,7 +71,7 @@
         device_role: "{{ item.role.name | default(item.device_role.name | default('N/A')) }}"
         primary_ip4: "{{ item.primary_ip4 | default(item.primary_ip) }}"
         # Interfaces are empty by default. Uncomment the enrichment play at the
-        # bottom of this file (include_tasks: tasks/generate_single_device.yml)
+        # bottom of this file (include_tasks: ../tasks/generate_single_device.yml)
         # to populate interface details including IP addresses.
         interfaces: []
         ansible_date_time:
@@ -93,7 +93,7 @@
         device_role: "{{ item.role.name | default(item.device_role.name | default('N/A')) }}"
         primary_ip4: "{{ item.primary_ip4 | default(item.primary_ip) }}"
         # Interfaces are empty by default. Uncomment the enrichment play at the
-        # bottom of this file (include_tasks: tasks/generate_single_device.yml)
+        # bottom of this file (include_tasks: ../tasks/generate_single_device.yml)
         # to populate interface details including IP addresses.
         interfaces: []
         ansible_date_time:

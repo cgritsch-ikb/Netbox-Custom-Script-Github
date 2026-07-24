@@ -1,0 +1,33 @@
+---
+# Global variables for all hosts
+# Override per group or host as needed
+
+# ── Netbox ────────────────────────────────────────────────────────────────────
+netbox_api: "{{ lookup('env', 'NETBOX_API') | default('http://netbox.example.com', true) }}"
+netbox_token: "{{ lookup('env', 'NETBOX_TOKEN') | default('YOUR_NETBOX_TOKEN', true) }}"
+
+# ── Config output directory ───────────────────────────────────────────────────
+config_output_dir: "{{ playbook_dir }}/../configs"
+
+# ── Common device credentials (override per host/group as needed) ─────────────
+ansible_user: "{{ lookup('env', 'DEVICE_USER') | default('CHANGE_ME', true) }}"
+ansible_password: "{{ lookup('env', 'DEVICE_PASSWORD') | default('CHANGE_ME', true) }}"
+ansible_become: false
+
+# ── NTP servers ───────────────────────────────────────────────────────────────
+ntp_servers:
+  - 10.0.0.1
+  - 10.0.0.2
+
+# ── DNS servers ───────────────────────────────────────────────────────────────
+dns_servers:
+  - 8.8.8.8
+  - 8.8.4.4
+
+# ── SNMP ──────────────────────────────────────────────────────────────────────
+snmp_community_ro: "CHANGE_ME"
+snmp_location: "{{ site | default('Unknown') }}"
+snmp_contact: "noc@example.com"
+
+# ── Syslog ────────────────────────────────────────────────────────────────────
+syslog_server: "10.0.0.100"

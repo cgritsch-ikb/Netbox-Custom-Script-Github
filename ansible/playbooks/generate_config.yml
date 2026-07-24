@@ -1,0 +1,145 @@
+---
+# generate_config.yml
+# Fetches devices from Netbox and generates vendor-specific configs
+# using Jinja2 templates.
+#
+# Usage:
+#   # Generate configs for ALL devices
+#   ansible-playbook playbooks/generate_config.yml
+#
+#   # Generate for a specific device
+#   ansible-playbook playbooks/generate_config.yml --limit my-router-01
+#
+#   # Generate for a specific manufacturer group
+#   ansible-playbook playbooks/generate_config.yml --limit manufacturer_cisco
+#
+# Required env variables:
+#   NETBOX_API    - Netbox base URL  (e.g. https://netbox.example.com)
+#   NETBOX_TOKEN  - Netbox API token
+#
+# Optional env variables:
+#   DEVICE_USER     - SSH username for devices (default: admin)
+#   DEVICE_PASSWORD - SSH password for devices (default: admin)
+
+- name: Fetch device information from Netbox
+  hosts: localhost
+  gather_facts: false
+  vars:
+    netbox_url: "{{ lookup('env', 'NETBOX_API') | default('http://netbox.example.com', true) }}"
+    netbox_api_token: "{{ lookup('env', 'NETBOX_TOKEN') | default('YOUR_NETBOX_TOKEN', true) }}"
+
+  tasks:
+    - name: Query all active devices from Netbox
+      ansible.builtin.uri:
+        url: "{{ netbox_url }}/api/dcim/devices/?status=active&has_primary_ip=true&limit=1000"
+        method: GET
+        headers:
+          Authorization: "Token {{ netbox_api_token }}"
+          Accept: "application/json"
+        validate_certs: false
+        return_content: true
+      register: netbox_devices_raw
+
+    - name: Set devices fact
+      ansible.builtin.set_fact:
+        netbox_devices: "{{ netbox_devices_raw.json.results }}"
+      when: netbox_devices_raw.status == 200
+
+    - name: Show device summary
+      ansible.builtin.debug:
+        msg: "Found {{ netbox_devices | length }} active device(s) with primary IP in Netbox."
+      when: netbox_devices is defined
+
+    - name: Ensure config output directory exists
+      ansible.builtin.file:
+        path: "{{ config_output_dir }}"
+        state: directory
+        mode: "0755"
+
+    - name: Generate Cisco configs
+      ansible.builtin.template:
+        src: "{{ playbook_dir }}/../templates/cisco/base_config.j2"
+        dest: "{{ config_output_dir }}/{{ item.name }}.cfg"
+        mode: "0644"
+      loop: "{{ netbox_devices | selectattr('device_type.manufacturer.name', 'search', '(?i)cisco') | list }}"
+      loop_control:
+        label: "{{ item.name }}"
+      vars:
+        inventory_hostname: "{{ item.name }}"
+        platform: "{{ item.platform.name | default('IOS') }}"
+        site: "{{ item.site.name | default('N/A') }}"
+        device_role: "{{ item.device_role.name | default('N/A') }}"
+        primary_ip4: "{{ item.primary_ip4 }}"
+        # Interfaces are empty by default. Uncomment the enrichment play at the
+        # bottom of this file (include_tasks: tasks/generate_single_device.yml)
+        # to populate interface details including IP addresses.
+        interfaces: []
+        ansible_date_time:
+          iso8601: "{{ lookup('pipe', 'date -u +\"%Y-%m-%dT%H:%M:%SZ\"') }}"
+      when: netbox_devices is defined
+
+    - name: Generate Huawei configs
+      ansible.builtin.template:
+        src: "{{ playbook_dir }}/../templates/huawei/base_config.j2"
+        dest: "{{ config_output_dir }}/{{ item.name }}.cfg"
+        mode: "0644"
+      loop: "{{ netbox_devices | selectattr('device_type.manufacturer.name', 'search', '(?i)huawei') | list }}"
+      loop_control:
+        label: "{{ item.name }}"
+      vars:
+        inventory_hostname: "{{ item.name }}"
+        platform: "{{ item.platform.name | default('VRP') }}"
+        site: "{{ item.site.name | default('N/A') }}"
+        device_role: "{{ item.device_role.name | default('N/A') }}"
+        primary_ip4: "{{ item.primary_ip4 }}"
+        # Interfaces are empty by default. Uncomment the enrichment play at the
+        # bottom of this file (include_tasks: tasks/generate_single_device.yml)
+        # to populate interface details including IP addresses.
+        interfaces: []
+        ansible_date_time:
+          iso8601: "{{ lookup('pipe', 'date -u +\"%Y-%m-%dT%H:%M:%SZ\"') }}"
+      when: netbox_devices is defined
+
+    - name: Config generation complete
+      ansible.builtin.debug:
+        msg: "Configs saved to {{ config_output_dir }}"
+
+
+# ── OPTIONAL: Enrich configs with interface data ─────────────────────────────
+# Uncomment this play to include interface details (IPs) in the generated configs.
+# This makes one additional Netbox API call per device.
+
+# - name: Generate enriched configs (with interfaces)
+#   hosts: localhost
+#   gather_facts: false
+#   vars:
+#     netbox_url: "{{ lookup('env', 'NETBOX_API') | default('http://netbox.example.com', true) }}"
+#     netbox_api_token: "{{ lookup('env', 'NETBOX_TOKEN') | default('YOUR_NETBOX_TOKEN', true) }}"
+#
+#   tasks:
+#     - name: Query active devices
+#       ansible.builtin.uri:
+#         url: "{{ netbox_url }}/api/dcim/devices/?status=active&has_primary_ip=true&limit=1000"
+#         method: GET
+#         headers:
+#           Authorization: "Token {{ netbox_api_token }}"
+#           Accept: "application/json"
+#         validate_certs: false
+#       register: netbox_devices_raw
+#
+#     - name: Set devices fact
+#       ansible.builtin.set_fact:
+#         netbox_devices: "{{ netbox_devices_raw.json.results }}"
+#
+#     - name: Ensure config output directory exists
+#       ansible.builtin.file:
+#         path: "{{ config_output_dir }}"
+#         state: directory
+#         mode: "0755"
+#
+#     - name: Fetch interfaces and generate config per device
+#       include_tasks: tasks/generate_single_device.yml
+#       loop: "{{ netbox_devices }}"
+#       loop_control:
+#         loop_var: device
+#         label: "{{ device.name }}"

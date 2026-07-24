@@ -1,0 +1,4 @@
+---
+# Huawei VRP specific variables
+ansible_network_os: ce
+ansible_connection: network_cli

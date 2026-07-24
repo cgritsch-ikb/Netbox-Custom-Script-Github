@@ -1,0 +1,91 @@
+! ============================================================
+! Cisco IOS / IOS-XE Base Configuration
+! Device  : {{ inventory_hostname }}
+! Platform: {{ platform | default('IOS') }}
+! Site    : {{ site | default('N/A') }}
+! Role    : {{ device_role | default('N/A') }}
+! Generated: {{ ansible_date_time.iso8601 | default('') }}
+! ============================================================
+
+version {{ ios_version | default('15.2') }}
+service timestamps debug datetime msec localtime show-timezone
+service timestamps log   datetime msec localtime show-timezone
+service password-encryption
+no service tcp-small-servers
+no service udp-small-servers
+!
+hostname {{ inventory_hostname }}
+!
+{% if dns_servers is defined and dns_servers | length > 0 %}
+{% for dns in dns_servers %}
+ip name-server {{ dns }}
+{% endfor %}
+{% endif %}
+ip domain-lookup
+!
+! ── Management ──────────────────────────────────────────────────
+{% if primary_ip4 is defined %}
+interface Loopback0
+ description Management-Loopback
+ ip address {{ primary_ip4.address | ansible.utils.ipaddr('address') }} 255.255.255.255
+ ! /32 is enforced for loopbacks; primary_ip4 CIDR is used only for routing.
+ no shutdown
+!
+{% endif %}
+! ── NTP ─────────────────────────────────────────────────────────
+{% if ntp_servers is defined %}
+{% for ntp in ntp_servers %}
+ntp server {{ ntp }}
+{% endfor %}
+{% endif %}
+!
+! ── SNMP ────────────────────────────────────────────────────────
+snmp-server community {{ snmp_community_ro }} RO
+snmp-server location {{ snmp_location }}
+snmp-server contact {{ snmp_contact }}
+snmp-server enable traps
+{% if syslog_server is defined %}
+!
+! ── Logging ─────────────────────────────────────────────────────
+logging host {{ syslog_server }}
+logging trap informational
+logging on
+{% endif %}
+!
+! ── Interfaces from Netbox ───────────────────────────────────────
+{% if interfaces is defined %}
+{% for iface in interfaces %}
+interface {{ iface.name }}
+ description {{ iface.description | default('') }}
+{% if iface.enabled %}
+ no shutdown
+{% else %}
+ shutdown
+{% endif %}
+{% if iface.ip_addresses is defined and iface.ip_addresses | length > 0 %}
+{% for ip in iface.ip_addresses %}
+ ip address {{ ip.address | ansible.utils.ipaddr('address') }} {{ ip.address | ansible.utils.ipaddr('netmask') }}
+{% endfor %}
+{% endif %}
+!
+{% endfor %}
+{% endif %}
+!
+! ── SSH / AAA ────────────────────────────────────────────────────
+! Note: 'crypto key generate rsa' is for initial provisioning only.
+! It will fail if RSA keys already exist on the device.
+crypto key generate rsa modulus 2048
+ip ssh version 2
+ip ssh time-out 60
+ip ssh authentication-retries 3
+!
+line vty 0 15
+ transport input ssh
+ login local
+ exec-timeout 10 0
+!
+line con 0
+ exec-timeout 10 0
+ logging synchronous
+!
+end

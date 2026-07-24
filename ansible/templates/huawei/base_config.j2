@@ -1,0 +1,82 @@
+#
+# ============================================================
+# Huawei VRP Base Configuration
+# Device  : {{ inventory_hostname }}
+# Platform: {{ platform | default('VRP') }}
+# Site    : {{ site | default('N/A') }}
+# Role    : {{ device_role | default('N/A') }}
+# Generated: {{ ansible_date_time.iso8601 | default('') }}
+# ============================================================
+#
+sysname {{ inventory_hostname }}
+#
+! ── DNS ─────────────────────────────────────────────────────────
+{% if dns_servers is defined and dns_servers | length > 0 %}
+dns resolve
+{% for dns in dns_servers %}
+dns server {{ dns }}
+{% endfor %}
+{% endif %}
+#
+! ── NTP ─────────────────────────────────────────────────────────
+{% if ntp_servers is defined %}
+ntp-service unicast-server {{ ntp_servers[0] }} preference
+{% if ntp_servers | length > 1 %}
+ntp-service unicast-server {{ ntp_servers[1] }}
+{% endif %}
+{% endif %}
+#
+! ── SNMP ────────────────────────────────────────────────────────
+snmp-agent
+snmp-agent community read {{ snmp_community_ro }}
+snmp-agent sys-info location {{ snmp_location }}
+snmp-agent sys-info contact {{ snmp_contact }}
+snmp-agent trap enable
+{% if syslog_server is defined %}
+#
+! ── Logging / Information-Center ────────────────────────────────
+info-center enable
+info-center loghost {{ syslog_server }} facility local7
+info-center source default channel loghost log state on warning on
+{% endif %}
+#
+! ── Management interface ─────────────────────────────────────────
+{% if primary_ip4 is defined %}
+interface LoopBack0
+ description Management-Loopback
+ ip address {{ primary_ip4.address | ansible.utils.ipaddr('address') }} {{ primary_ip4.address | ansible.utils.ipaddr('netmask') }}
+#
+{% endif %}
+! ── Interfaces from Netbox ───────────────────────────────────────
+{% if interfaces is defined %}
+{% for iface in interfaces %}
+interface {{ iface.name }}
+ description {{ iface.description | default('') }}
+{% if not iface.enabled %}
+ shutdown
+{% else %}
+ undo shutdown
+{% endif %}
+{% if iface.ip_addresses is defined and iface.ip_addresses | length > 0 %}
+{% for ip in iface.ip_addresses %}
+ ip address {{ ip.address | ansible.utils.ipaddr('address') }} {{ ip.address | ansible.utils.ipaddr('netmask') }}
+{% endfor %}
+{% endif %}
+#
+{% endfor %}
+{% endif %}
+! ── SSH ──────────────────────────────────────────────────────────
+stelnet server enable
+ssh server-source all-interface
+ssh user {{ ansible_user }} authentication-type password
+ssh user {{ ansible_user }} service-type stelnet
+#
+user-interface vty 0 4
+ protocol inbound ssh
+ authentication-mode aaa
+ idle-timeout 10 0
+#
+user-interface console 0
+ idle-timeout 10 0
+#
+return

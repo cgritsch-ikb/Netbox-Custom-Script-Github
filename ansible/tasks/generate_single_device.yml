@@ -1,0 +1,87 @@
+---
+# tasks/generate_single_device.yml
+# Fetches interface data for a single device and generates its config.
+# Called with loop variable "device" from the parent playbook.
+
+- name: "{{ device.name }} – fetch interfaces from Netbox"
+  ansible.builtin.uri:
+    url: "{{ netbox_url }}/api/dcim/interfaces/?device_id={{ device.id }}&limit=500"
+    method: GET
+    headers:
+      Authorization: "Token {{ netbox_api_token }}"
+      Accept: "application/json"
+    validate_certs: false
+  register: iface_raw
+
+- name: "{{ device.name }} – fetch IP addresses from Netbox"
+  ansible.builtin.uri:
+    url: "{{ netbox_url }}/api/ipam/ip-addresses/?device={{ device.name }}&limit=500"
+    method: GET
+    headers:
+      Authorization: "Token {{ netbox_api_token }}"
+      Accept: "application/json"
+    validate_certs: false
+  register: ip_raw
+
+- name: "{{ device.name }} – build enriched interface list"
+  ansible.builtin.set_fact:
+    # Build a lookup dict { interface_name: [ip, ...] } in one pass, then merge.
+    _ip_by_iface: >-
+      {{
+        ip_raw.json.results
+        | selectattr('assigned_object', 'defined')
+        | selectattr('assigned_object.name', 'defined')
+        | groupby('assigned_object.name')
+        | items2dict(key_name=0, value_name=1)
+      }}
+
+- name: "{{ device.name }} – attach IPs to interfaces"
+  ansible.builtin.set_fact:
+    device_interfaces: >-
+      {{
+        iface_raw.json.results | map('combine', {
+          'ip_addresses': _ip_by_iface.get(item.name, [])
+        }) | list
+      }}
+  loop: "{{ iface_raw.json.results }}"
+  loop_control:
+    loop_var: item
+    label: "{{ item.name }}"
+  # Collapse loop results into a flat list
+  register: _iface_build
+
+- name: "{{ device.name }} – flatten interface list"
+  ansible.builtin.set_fact:
+    device_interfaces: "{{ _iface_build.results | map(attribute='ansible_facts.device_interfaces') | flatten | unique(attribute='name') | list }}"
+
+- name: "{{ device.name }} – generate Cisco config"
+  ansible.builtin.template:
+    src: "{{ playbook_dir }}/../templates/cisco/base_config.j2"
+    dest: "{{ config_output_dir }}/{{ device.name }}.cfg"
+    mode: "0644"
+  vars:
+    inventory_hostname: "{{ device.name }}"
+    platform: "{{ device.platform.name | default('IOS') }}"
+    site: "{{ device.site.name | default('N/A') }}"
+    device_role: "{{ device.device_role.name | default('N/A') }}"
+    primary_ip4: "{{ device.primary_ip4 }}"
+    interfaces: "{{ device_interfaces }}"
+    ansible_date_time:
+      iso8601: "{{ lookup('pipe', 'date -u +\"%Y-%m-%dT%H:%M:%SZ\"') }}"
+  when: device.device_type.manufacturer.name | lower is search('cisco')
+
+- name: "{{ device.name }} – generate Huawei config"
+  ansible.builtin.template:
+    src: "{{ playbook_dir }}/../templates/huawei/base_config.j2"
+    dest: "{{ config_output_dir }}/{{ device.name }}.cfg"
+    mode: "0644"
+  vars:
+    inventory_hostname: "{{ device.name }}"
+    platform: "{{ device.platform.name | default('VRP') }}"
+    site: "{{ device.site.name | default('N/A') }}"
+    device_role: "{{ device.device_role.name | default('N/A') }}"
+    primary_ip4: "{{ device.primary_ip4 }}"
+    interfaces: "{{ device_interfaces }}"
+    ansible_date_time:
+      iso8601: "{{ lookup('pipe', 'date -u +\"%Y-%m-%dT%H:%M:%SZ\"') }}"
+  when: device.device_type.manufacturer.name | lower is search('huawei')

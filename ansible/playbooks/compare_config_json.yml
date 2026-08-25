@@ -1,0 +1,59 @@
+---
+# compare_config_json.yml
+# Compares NetBox-generated config JSON and running-config JSON per device.
+
+- name: Compare generated and running config JSON
+  hosts: localhost
+  gather_facts: false
+  vars:
+    netbox_url: "{{ lookup('env', 'NETBOX_API') | default('http://netbox.example.com', true) }}"
+    netbox_api_token: "{{ lookup('env', 'NETBOX_TOKEN') | default('YOUR_NETBOX_TOKEN', true) }}"
+
+  tasks:
+    - name: Ensure compare output directory exists
+      ansible.builtin.file:
+        path: "{{ config_compare_dir }}"
+        state: directory
+        mode: "0755"
+
+    - name: Query active CPE-Business-Pro devices from Netbox
+      ansible.builtin.uri:
+        url: "{{ netbox_url }}/api/dcim/devices/?status=active&role=CPE-Business-Pro&has_primary_ip=true&limit=1000"
+        method: GET
+        headers:
+          Authorization: "Token {{ netbox_api_token }}"
+          Accept: "application/json"
+        validate_certs: false
+        return_content: true
+      register: netbox_devices_raw
+
+    - name: Set devices fact
+      ansible.builtin.set_fact:
+        netbox_devices: "{{ netbox_devices_raw.json.results }}"
+      when: netbox_devices_raw.status == 200
+
+    - name: Initialize compare result list
+      ansible.builtin.set_fact:
+        compare_results: []
+
+    - name: Compare JSON files per device
+      ansible.builtin.include_tasks: "{{ playbook_dir }}/../tasks/compare_single_device_configs.yml"
+      loop: "{{ netbox_devices | default([]) }}"
+      loop_control:
+        loop_var: device
+        label: "{{ device.name }}"
+
+    - name: Write comparison summary report
+      ansible.builtin.copy:
+        dest: "{{ config_compare_dir }}/summary.json"
+        mode: "0644"
+        content: |
+          {{
+            {
+              "device_count": compare_results | length,
+              "equal_count": (compare_results | selectattr('status', 'equalto', 'equal') | list | length),
+              "different_count": (compare_results | selectattr('status', 'equalto', 'different') | list | length),
+              "incomplete_count": (compare_results | selectattr('status', 'equalto', 'incomplete') | list | length),
+              "results": compare_results
+            } | to_nice_json
+          }}

@@ -1,0 +1,29 @@
+---
+# collect_running_config.yml
+# Collects running-config from Cisco IOS/IOS-XE devices.
+
+- name: Collect running-config from Cisco devices
+  hosts: manufacturer_cisco
+  gather_facts: false
+
+  tasks:
+    - name: Ensure running-config output directory exists
+      ansible.builtin.file:
+        path: "{{ config_running_dir }}"
+        state: directory
+        mode: "0755"
+      delegate_to: localhost
+      run_once: true
+
+    - name: Collect running configuration
+      cisco.ios.ios_command:
+        commands:
+          - show running-config
+      register: running_config_raw
+
+    - name: Save running configuration to file
+      ansible.builtin.copy:
+        dest: "{{ config_running_dir }}/{{ inventory_hostname }}.running.cfg"
+        content: "{{ (running_config_raw.stdout | first | default('')) ~ '\n' }}"
+        mode: "0644"
+      delegate_to: localhost

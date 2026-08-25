@@ -13,7 +13,7 @@ token: "{{ lookup('env', 'NETBOX_TOKEN') | default('YOUR_NETBOX_TOKEN', true) }}
 # Only fetch devices that are active
 device_query_filters:
   - status: "active"
-  - role: "mpls-cpe"
+  - role: "CPE-Business-Pro"
 
 # Pull additional fields from Netbox
 fetch_all: false

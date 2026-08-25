@@ -29,9 +29,9 @@
     netbox_api_token: "{{ lookup('env', 'NETBOX_TOKEN') | default('YOUR_NETBOX_TOKEN', true) }}"
 
   tasks:
-    - name: Query all active devices from Netbox
+    - name: Query active CPE-Business-Pro devices from Netbox
       ansible.builtin.uri:
-        url: "{{ netbox_url }}/api/dcim/devices/?status=active&role=mpls-cpe&has_primary_ip=true&limit=1000"
+        url: "{{ netbox_url }}/api/dcim/devices/?status=active&role=CPE-Business-Pro&has_primary_ip=true&limit=1000"
         method: GET
         headers:
           Authorization: "Token {{ netbox_api_token }}"
@@ -47,7 +47,7 @@
 
     - name: Show device summary
       ansible.builtin.debug:
-        msg: "Found {{ netbox_devices | length }} active device(s) with primary IP in Netbox."
+        msg: "Found {{ netbox_devices | length }} active CPE-Business-Pro device(s) with primary IP in Netbox."
       when: netbox_devices is defined
 
     - name: Ensure config output directory exists
@@ -119,7 +119,7 @@
 #   tasks:
 #     - name: Query active devices
 #       ansible.builtin.uri:
-#         url: "{{ netbox_url }}/api/dcim/devices/?status=active&role=mpls-cpe&has_primary_ip=true&limit=1000"
+#         url: "{{ netbox_url }}/api/dcim/devices/?status=active&role=CPE-Business-Pro&has_primary_ip=true&limit=1000"
 #         method: GET
 #         headers:
 #           Authorization: "Token {{ netbox_api_token }}"

@@ -6,8 +6,12 @@
 netbox_api: "{{ lookup('env', 'NETBOX_API') | default('http://netbox.example.com', true) }}"
 netbox_token: "{{ lookup('env', 'NETBOX_TOKEN') | default('YOUR_NETBOX_TOKEN', true) }}"
 
-# ── Config output directory ───────────────────────────────────────────────────
-config_output_dir: "{{ playbook_dir }}/../configs"
+# ── Config output directories ─────────────────────────────────────────────────
+config_generated_dir: "{{ playbook_dir }}/../configs/generated"
+config_running_dir: "{{ playbook_dir }}/../configs/running"
+config_json_dir: "{{ playbook_dir }}/../configs/json"
+config_compare_dir: "{{ playbook_dir }}/../configs/compare"
+config_output_dir: "{{ config_generated_dir }}"
 
 # ── Common device credentials (override per host/group as needed) ─────────────
 ansible_user: "{{ lookup('env', 'DEVICE_USER') | default('CHANGE_ME', true) }}"

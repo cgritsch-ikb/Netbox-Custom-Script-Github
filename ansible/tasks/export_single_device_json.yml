@@ -1,0 +1,76 @@
+---
+# tasks/export_single_device_json.yml
+# Exports one device's generated and running configs to JSON.
+
+- name: "{{ device.name }} – check generated config file"
+  ansible.builtin.stat:
+    path: "{{ config_generated_dir }}/{{ device.name }}.cfg"
+  register: generated_cfg_stat
+
+- name: "{{ device.name }} – check running config file"
+  ansible.builtin.stat:
+    path: "{{ config_running_dir }}/{{ device.name }}.running.cfg"
+  register: running_cfg_stat
+
+- name: "{{ device.name }} – read generated config file"
+  ansible.builtin.slurp:
+    path: "{{ config_generated_dir }}/{{ device.name }}.cfg"
+  register: generated_cfg_raw
+  when: generated_cfg_stat.stat.exists
+
+- name: "{{ device.name }} – read running config file"
+  ansible.builtin.slurp:
+    path: "{{ config_running_dir }}/{{ device.name }}.running.cfg"
+  register: running_cfg_raw
+  when: running_cfg_stat.stat.exists
+
+- name: "{{ device.name }} – set config text facts"
+  ansible.builtin.set_fact:
+    generated_config_text: "{{ (generated_cfg_raw.content | b64decode) if generated_cfg_stat.stat.exists else '' }}"
+    running_config_text: "{{ (running_cfg_raw.content | b64decode) if running_cfg_stat.stat.exists else '' }}"
+
+- name: "{{ device.name }} – write generated config JSON"
+  ansible.builtin.copy:
+    dest: "{{ config_json_dir }}/{{ device.name }}.generated.json"
+    mode: "0644"
+    content: |
+      {{
+        {
+          "source": "netbox_generated",
+          "device": {
+            "id": device.id,
+            "name": device.name,
+            "role": (device.role.name | default(device.device_role.name | default(''))),
+            "platform": (device.platform.name | default('')),
+            "manufacturer": (device.device_type.manufacturer.name | default('')),
+            "site": (device.site.name | default('')),
+            "primary_ip4": ((device.primary_ip4.address | default(device.primary_ip.address | default(''))))
+          },
+          "source_file": config_generated_dir ~ "/" ~ device.name ~ ".cfg",
+          "config_present": (generated_cfg_stat.stat.exists | bool),
+          "config_text": generated_config_text
+        } | to_nice_json
+      }}
+
+- name: "{{ device.name }} – write running config JSON"
+  ansible.builtin.copy:
+    dest: "{{ config_json_dir }}/{{ device.name }}.running.json"
+    mode: "0644"
+    content: |
+      {{
+        {
+          "source": "device_running",
+          "device": {
+            "id": device.id,
+            "name": device.name,
+            "role": (device.role.name | default(device.device_role.name | default(''))),
+            "platform": (device.platform.name | default('')),
+            "manufacturer": (device.device_type.manufacturer.name | default('')),
+            "site": (device.site.name | default('')),
+            "primary_ip4": ((device.primary_ip4.address | default(device.primary_ip.address | default(''))))
+          },
+          "source_file": config_running_dir ~ "/" ~ device.name ~ ".running.cfg",
+          "config_present": (running_cfg_stat.stat.exists | bool),
+          "config_text": running_config_text
+        } | to_nice_json
+      }}

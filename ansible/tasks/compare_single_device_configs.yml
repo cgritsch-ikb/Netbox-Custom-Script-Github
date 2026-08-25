@@ -1,0 +1,74 @@
+---
+# tasks/compare_single_device_configs.yml
+# Compares one device's generated and running config JSON files.
+
+- name: "{{ device.name }} – check generated JSON file"
+  ansible.builtin.stat:
+    path: "{{ config_json_dir }}/{{ device.name }}.generated.json"
+  register: generated_json_stat
+
+- name: "{{ device.name }} – check running JSON file"
+  ansible.builtin.stat:
+    path: "{{ config_json_dir }}/{{ device.name }}.running.json"
+  register: running_json_stat
+
+- name: "{{ device.name }} – read generated JSON file"
+  ansible.builtin.slurp:
+    path: "{{ config_json_dir }}/{{ device.name }}.generated.json"
+  register: generated_json_raw
+  when: generated_json_stat.stat.exists
+
+- name: "{{ device.name }} – read running JSON file"
+  ansible.builtin.slurp:
+    path: "{{ config_json_dir }}/{{ device.name }}.running.json"
+  register: running_json_raw
+  when: running_json_stat.stat.exists
+
+- name: "{{ device.name }} – parse JSON payloads"
+  ansible.builtin.set_fact:
+    generated_payload: "{{ (generated_json_raw.content | b64decode | from_json) if generated_json_stat.stat.exists else {} }}"
+    running_payload: "{{ (running_json_raw.content | b64decode | from_json) if running_json_stat.stat.exists else {} }}"
+
+- name: "{{ device.name }} – set comparison inputs"
+  ansible.builtin.set_fact:
+    generated_present: "{{ generated_payload.config_present | default(false) | bool }}"
+    running_present: "{{ running_payload.config_present | default(false) | bool }}"
+    generated_config_text: "{{ generated_payload.config_text | default('') }}"
+    running_config_text: "{{ running_payload.config_text | default('') }}"
+
+- name: "{{ device.name }} – calculate comparison details"
+  ansible.builtin.set_fact:
+    generated_lines: "{{ generated_config_text.splitlines() }}"
+    running_lines: "{{ running_config_text.splitlines() }}"
+    missing_in_running: "{{ generated_config_text.splitlines() | difference(running_config_text.splitlines()) }}"
+    extra_in_running: "{{ running_config_text.splitlines() | difference(generated_config_text.splitlines()) }}"
+    configs_equal: "{{ generated_config_text == running_config_text }}"
+
+- name: "{{ device.name }} – build comparison result"
+  ansible.builtin.set_fact:
+    device_compare_result:
+      device_name: "{{ device.name }}"
+      generated_json_file: "{{ config_json_dir }}/{{ device.name }}.generated.json"
+      running_json_file: "{{ config_json_dir }}/{{ device.name }}.running.json"
+      status: >-
+        {{
+          'incomplete'
+          if (not generated_present or not running_present)
+          else ('equal' if configs_equal else 'different')
+        }}
+      generated_present: "{{ generated_present }}"
+      running_present: "{{ running_present }}"
+      generated_line_count: "{{ generated_lines | length }}"
+      running_line_count: "{{ running_lines | length }}"
+      missing_in_running: "{{ missing_in_running }}"
+      extra_in_running: "{{ extra_in_running }}"
+
+- name: "{{ device.name }} – write per-device comparison report"
+  ansible.builtin.copy:
+    dest: "{{ config_compare_dir }}/{{ device.name }}.comparison.json"
+    mode: "0644"
+    content: "{{ device_compare_result | to_nice_json }}"
+
+- name: "{{ device.name }} – add result to summary list"
+  ansible.builtin.set_fact:
+    compare_results: "{{ compare_results + [device_compare_result] }}"

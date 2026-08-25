@@ -1,0 +1,40 @@
+---
+# export_config_json.yml
+# Converts generated (NetBox/Jinja) and running configs into JSON per device.
+
+- name: Export generated and running configs to JSON
+  hosts: localhost
+  gather_facts: false
+  vars:
+    netbox_url: "{{ lookup('env', 'NETBOX_API') | default('http://netbox.example.com', true) }}"
+    netbox_api_token: "{{ lookup('env', 'NETBOX_TOKEN') | default('YOUR_NETBOX_TOKEN', true) }}"
+
+  tasks:
+    - name: Ensure JSON output directory exists
+      ansible.builtin.file:
+        path: "{{ config_json_dir }}"
+        state: directory
+        mode: "0755"
+
+    - name: Query active CPE-Business-Pro devices from Netbox
+      ansible.builtin.uri:
+        url: "{{ netbox_url }}/api/dcim/devices/?status=active&role=CPE-Business-Pro&has_primary_ip=true&limit=1000"
+        method: GET
+        headers:
+          Authorization: "Token {{ netbox_api_token }}"
+          Accept: "application/json"
+        validate_certs: false
+        return_content: true
+      register: netbox_devices_raw
+
+    - name: Set devices fact
+      ansible.builtin.set_fact:
+        netbox_devices: "{{ netbox_devices_raw.json.results }}"
+      when: netbox_devices_raw.status == 200
+
+    - name: Export JSON files per device
+      ansible.builtin.include_tasks: "{{ playbook_dir }}/../tasks/export_single_device_json.yml"
+      loop: "{{ netbox_devices | default([]) }}"
+      loop_control:
+        loop_var: device
+        label: "{{ device.name }}"

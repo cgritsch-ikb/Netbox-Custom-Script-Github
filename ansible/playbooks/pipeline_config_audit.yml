@@ -1,0 +1,19 @@
+---
+# pipeline_config_audit.yml
+# End-to-end workflow:
+# 1) Generate target config from NetBox/Jinja
+# 2) Collect running config from Cisco IOS/IOS-XE devices
+# 3) Export both config sources to JSON
+# 4) Compare JSON files and write reports
+
+- name: Generate target configs from NetBox/Jinja
+  ansible.builtin.import_playbook: generate_config.yml
+
+- name: Collect running-config from Cisco IOS/IOS-XE
+  ansible.builtin.import_playbook: collect_running_config.yml
+
+- name: Export both config sources to JSON
+  ansible.builtin.import_playbook: export_config_json.yml
+
+- name: Compare generated vs running JSON configs
+  ansible.builtin.import_playbook: compare_config_json.yml

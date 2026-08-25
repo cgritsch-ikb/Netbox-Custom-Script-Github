@@ -1,3 +1,4 @@
 # Generated device configurations – not committed to version control
-*.cfg
+**/*.cfg
+**/*.json
 !.gitkeep

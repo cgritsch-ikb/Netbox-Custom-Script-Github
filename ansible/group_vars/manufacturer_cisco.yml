@@ -1,4 +1,0 @@
----
-# Cisco IOS / IOS-XE specific variables
-ansible_network_os: cisco.ios.ios
-ansible_connection: network_cli

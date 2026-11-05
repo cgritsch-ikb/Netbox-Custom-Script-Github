@@ -115,6 +115,7 @@
 #   vars:
 #     netbox_url: "{{ lookup('env', 'NETBOX_API') | default('http://netbox.example.com', true) }}"
 #     netbox_api_token: "{{ lookup('env', 'NETBOX_TOKEN') | default('YOUR_NETBOX_TOKEN', true) }}"
+#     netbox_validate_certs: false
 #
 #   tasks:
 #     - name: Query active devices

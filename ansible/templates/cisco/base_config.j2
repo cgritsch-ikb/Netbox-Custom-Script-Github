@@ -4,6 +4,7 @@
 ! Platform: {{ platform | default('IOS') }}
 ! Site    : {{ site | default('N/A') }}
 ! Role    : {{ device_role | default('N/A') }}
+! Device tags: {% for tag in device_tags | default([]) %}{{ tag.slug | default(tag.name | default(tag)) | string | replace('\r', ' ') | replace('\n', ' ') }}{{ ', ' if not loop.last else '' }}{% endfor %}
 ! Generated: {{ ansible_date_time.iso8601 | default('') }}
 ! ============================================================
 
@@ -60,6 +61,9 @@ logging on
 {% if interfaces is defined %}
 {% for iface in interfaces %}
 interface {{ iface.name }}
+{% if iface.tags | default([]) | length > 0 %}
+ ! Tags: {% for tag in iface.tags %}{{ tag.slug | default(tag.name | default(tag)) | string | replace('\r', ' ') | replace('\n', ' ') }}{{ ', ' if not loop.last else '' }}{% endfor %}
+{% endif %}
  description {{ iface.description | default('') }}
 {% if iface.enabled %}
  no shutdown

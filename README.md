@@ -5,6 +5,64 @@ Die Gerätedaten werden direkt aus **NetBox** bezogen (Rolle **CPE-Business-Pro*
 
 ---
 
+## CPE-GIN: Cisco-Konfigurationen mit allen Interface-IPs
+
+Das zusätzliche Playbook
+`ansible/playbooks/generate_cpe_gin_config.yml` fragt die NetBox-API ab und
+erzeugt pro Cisco-Gerät der Rolle **CPE-GIN** eine lokale Konfiguration.
+Es berücksichtigt alle API-Seiten für Geräte, Interfaces und zugewiesene
+IP-Adressen, auch bei einem serverseitigen Seitenlimit.
+Eine Primary-IP oder SSH-Verbindung zum Gerät ist nicht erforderlich;
+es werden keine Konfigurationen auf Geräte übertragen.
+
+```bash
+export NETBOX_API="https://netbox.example.com"
+export NETBOX_TOKEN="your-api-token-here"
+cd ansible
+ansible-playbook -i localhost, playbooks/generate_cpe_gin_config.yml
+```
+
+`NETBOX_TOKEN` benötigt nur Leserechte auf Geräte, Interfaces und IP-Adressen.
+Die vorhandenen Collections sowie das Python-Paket `netaddr` müssen in der
+Python-Umgebung von Ansible installiert sein. Das statische Localhost-Inventory
+umgeht die abweichenden Filter des bisherigen dynamischen Inventorys.
+
+Der Rollenfilter verwendet den **Slug**, nicht den Anzeigenamen.
+Standard ist `cpe-gin`; bei einem anderen Slug:
+
+```bash
+ansible-playbook -i localhost, playbooks/generate_cpe_gin_config.yml -e netbox_device_role=mein-rollen-slug
+```
+
+Ausgabe: `ansible/configs/generated/<gerätename>.cfg`.
+IPv4-Adressen werden mit Netzmaske ausgegeben, weitere IPv4-Adressen desselben
+Interfaces als `secondary`; IPv6-Adressen behalten ihre Präfixlänge.
+IPv6-Link-Local-Adressen werden mit dem Cisco-Schlüsselwort `link-local`
+ohne Präfixlänge erzeugt.
+Die Primary-IP wird nicht zusätzlich auf ein erfundenes Loopback kopiert.
+NetBox bleibt die Quelle für Interface-Namen, Beschreibungen und Aktivierung.
+Ohne zugewiesene IPs wird nur das Interface erzeugt.
+
+Die TLS-Zertifikatsprüfung ist eingeschaltet. Bei einer internen CA sollte deren
+Zertifikat auf dem Ansible-Controller als vertrauenswürdig installiert werden.
+NTP, DNS, SNMP und weitere Basiswerte vor Verwendung in
+`ansible/group_vars/all.yml` anpassen und die generierten Konfigurationen prüfen.
+Das Template richtet sich an geroutete Cisco-IOS/IOS-XE-Interfaces, nicht an
+eine vollständige Switchport-, VRF- oder herstellerspezifische Service-Konfiguration.
+
+Die nachfolgenden bisherigen Playbooks und Inventory-Filter bleiben unverändert.
+
+Die Integrationstests verwenden eine lokale, paginierte NetBox-Test-API:
+
+```bash
+python -m unittest discover -s tests -v
+```
+
+Hierfür müssen Ansible, die Collections und `netaddr` installiert sein.
+Der Testbefehl wird im Repository-Hauptverzeichnis ausgeführt.
+
+---
+
 ## Voraussetzungen
 
 | Software | Version |

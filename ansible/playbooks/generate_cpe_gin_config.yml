@@ -1,0 +1,50 @@
+---
+- name: Generate Cisco configurations for CPE-GIN devices from NetBox
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars_files:
+    - ../group_vars/all.yml
+  vars:
+    netbox_url: "{{ lookup('env', 'NETBOX_API') | regex_replace('/+$', '') }}"
+    netbox_api_token: "{{ lookup('env', 'NETBOX_TOKEN') }}"
+    netbox_device_role: cpe-gin
+    netbox_validate_certs: true
+    generate_management_loopback: false
+
+  tasks:
+    - name: Require NetBox connection settings
+      ansible.builtin.assert:
+        that:
+          - netbox_url is match('^https?://')
+          - netbox_api_token | length > 0
+        fail_msg: Set NETBOX_API and NETBOX_TOKEN before running this playbook.
+      no_log: true
+
+    - name: Fetch all devices with the requested role
+      ansible.builtin.include_tasks: ../tasks/fetch_netbox_objects.yml
+      vars:
+        netbox_endpoint: dcim/devices
+        netbox_filter: "role={{ netbox_device_role | urlencode }}"
+
+    - name: Save device list
+      ansible.builtin.set_fact:
+        netbox_devices: "{{ netbox_objects }}"
+
+    - name: Ensure config output directory exists
+      ansible.builtin.file:
+        path: "{{ config_output_dir }}"
+        state: directory
+        mode: "0700"
+
+    - name: Fetch all interfaces and addresses and render each Cisco device
+      ansible.builtin.include_tasks: ../tasks/generate_single_device.yml
+      loop: "{{ netbox_devices }}"
+      loop_control:
+        loop_var: device
+        label: "{{ device.name }}"
+      when: device.device_type.manufacturer.name | lower is search('cisco')
+
+    - name: Show output location
+      ansible.builtin.debug:
+        msg: "Cisco configurations saved to {{ config_output_dir }} (no device changes applied)."

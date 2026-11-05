@@ -1,0 +1,42 @@
+---
+- name: Fetch first NetBox result page
+  ansible.builtin.uri:
+    url: "{{ netbox_url }}/api/{{ netbox_endpoint }}/?{{ netbox_filter }}&limit=500&offset=0"
+    method: GET
+    headers:
+      Authorization: "Token {{ netbox_api_token }}"
+      Accept: application/json
+    unredirected_headers:
+      - Authorization
+    validate_certs: "{{ netbox_validate_certs | default(true) }}"
+  register: _netbox_first_page
+  no_log: true
+
+- name: Initialize NetBox results and server page size
+  ansible.builtin.set_fact:
+    netbox_objects: "{{ _netbox_first_page.json.results }}"
+    _netbox_page_size: "{{ [_netbox_first_page.json.results | length, 1] | max }}"
+
+- name: Fetch remaining NetBox result pages
+  ansible.builtin.uri:
+    url: "{{ netbox_url }}/api/{{ netbox_endpoint }}/?{{ netbox_filter }}&limit={{ _netbox_page_size }}&offset={{ netbox_offset }}"
+    method: GET
+    headers:
+      Authorization: "Token {{ netbox_api_token }}"
+      Accept: application/json
+    unredirected_headers:
+      - Authorization
+    validate_certs: "{{ netbox_validate_certs | default(true) }}"
+  loop: "{{ range(_netbox_page_size | int, _netbox_first_page.json.count | int, _netbox_page_size | int) | list }}"
+  loop_control:
+    loop_var: netbox_offset
+  register: _netbox_remaining_pages
+  no_log: true
+
+- name: Combine NetBox result pages
+  ansible.builtin.set_fact:
+    netbox_objects: "{{ netbox_objects + netbox_page.json.results }}"
+  loop: "{{ _netbox_remaining_pages.results }}"
+  loop_control:
+    loop_var: netbox_page
+  no_log: true

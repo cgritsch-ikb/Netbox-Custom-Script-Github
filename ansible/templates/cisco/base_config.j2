@@ -24,12 +24,16 @@ ip name-server {{ dns }}
 ip domain-lookup
 !
 ! ── Management ──────────────────────────────────────────────────
-{% if primary_ip4 is defined %}
+{% if generate_management_loopback | default(true) and primary_ip4 is defined and primary_ip4 and not (interfaces | default([]) | length) %}
 interface Loopback0
  description Management-Loopback
  ip address {{ primary_ip4.address | ansible.utils.ipaddr('address') }} 255.255.255.255
  ! /32 is enforced for loopbacks; primary_ip4 CIDR is used only for routing.
  no shutdown
+!
+{% endif %}
+{% if interfaces | default([]) | map(attribute='ip_addresses') | flatten | selectattr('family.value', 'equalto', 6) | list | length > 0 %}
+ipv6 unicast-routing
 !
 {% endif %}
 ! ── NTP ─────────────────────────────────────────────────────────
@@ -63,8 +67,16 @@ interface {{ iface.name }}
  shutdown
 {% endif %}
 {% if iface.ip_addresses is defined and iface.ip_addresses | length > 0 %}
-{% for ip in iface.ip_addresses %}
- ip address {{ ip.address | ansible.utils.ipaddr('address') }} {{ ip.address | ansible.utils.ipaddr('netmask') }}
+{% set ipv4_addresses = iface.ip_addresses | selectattr('family.value', 'equalto', 4) | list %}
+{% for ip in ipv4_addresses %}
+ ip address {{ ip.address | ansible.utils.ipaddr('address') }} {{ ip.address | ansible.utils.ipaddr('netmask') }}{{ ' secondary' if not loop.first else '' }}
+{% endfor %}
+{% for ip in iface.ip_addresses | selectattr('family.value', 'equalto', 6) %}
+{% if ip.address | ansible.utils.ipaddr('link-local') %}
+ ipv6 address {{ ip.address | ansible.utils.ipaddr('address') }} link-local
+{% else %}
+ ipv6 address {{ ip.address }}
+{% endif %}
 {% endfor %}
 {% endif %}
 !

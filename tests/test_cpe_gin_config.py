@@ -13,10 +13,11 @@ from urllib.parse import parse_qs, urlparse
 ROOT = Path(__file__).resolve().parents[1]
 
 
-def device(identifier, name, vendor="Cisco", primary=None):
+def device(identifier, name, vendor="Cisco", primary=None, tags=None):
     return {
         "id": identifier,
         "name": name,
+        "tags": tags or [],
         "device_type": {"manufacturer": {"name": vendor}},
         "platform": None,
         "site": {"name": "Test"},
@@ -25,10 +26,11 @@ def device(identifier, name, vendor="Cisco", primary=None):
     }
 
 
-def interface(identifier, name, enabled=True):
+def interface(identifier, name, enabled=True, tags=None):
     return {
         "id": identifier,
         "name": name,
+        "tags": tags or [],
         "description": "Test interface",
         "enabled": enabled,
     }
@@ -47,14 +49,20 @@ def address(cidr, family, name):
 class ConfigGenerationTests(unittest.TestCase):
     def setUp(self):
         self.devices = [
-            device(1, "router-01"),
+            device(
+                1, "router-01",
+                tags=[{"name": "Core Network", "slug": "core-network"}],
+            ),
             device(2, "router-empty", primary={"address": "192.0.2.9/24"}),
             device(3, "router-v6"),
             device(4, "huawei-01", "Huawei"),
         ]
         self.interfaces = {
             1: [
-                interface(11, "GigabitEthernet0/0"),
+                interface(
+                    11, "GigabitEthernet0/0",
+                    tags=[{"name": "Uplink", "slug": "uplink"}],
+                ),
                 interface(12, "GigabitEthernet0/1", False),
             ],
             2: [],
@@ -141,6 +149,8 @@ class ConfigGenerationTests(unittest.TestCase):
         self.assertIn("ipv6 address fe80::1 link-local", config)
         self.assertNotIn("ipv6 address fe80::1/64", config)
         self.assertIn("ipv6 unicast-routing", config)
+        self.assertIn("! Device tags: core-network", config)
+        self.assertIn(" ! Tags: uplink", config)
         self.assertIn(
             "interface GigabitEthernet0/1\n description Test interface\n shutdown",
             config,

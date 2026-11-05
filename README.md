@@ -4,7 +4,8 @@ Dieses Repository enthält nur den CPE-GIN-Workflow zur Generierung von
 Cisco-IOS/IOS-XE-Konfigurationen aus NetBox. Das Playbook liest Geräte mit der
 NetBox-Rolle `cpe-gin`, deren Interfaces und zugewiesene IP-Adressen. Es
 überträgt keine Konfigurationen auf Geräte und benötigt weder eine Primary-IP
-noch eine SSH-Verbindung.
+noch eine SSH-Verbindung. Zugeordnete Tags von Geräten und Interfaces werden
+als Kommentare in der generierten Konfiguration ausgegeben.
 
 ## Voraussetzungen
 
@@ -19,7 +20,8 @@ python -m pip install netaddr
 
 ## Ausführen
 
-Der API-Token benötigt Leserechte auf Geräte, Interfaces und IP-Adressen.
+Der API-Token benötigt Leserechte auf Geräte, Interfaces und IP-Adressen
+einschließlich der zugeordneten Tags.
 TLS-Zertifikatsprüfungen sind eingeschaltet; bei einer internen CA muss deren
 Zertifikat auf dem Ansible-Controller vertrauenswürdig installiert sein.
 

@@ -1,0 +1,15 @@
+services:
+  act-runner:
+    image: gitea/act_runner:latest
+    restart: unless-stopped
+    environment:
+      CONFIG_FILE: /config.yaml
+      GITEA_INSTANCE_URL: ${GITEA_INSTANCE_URL:?Set GITEA_INSTANCE_URL in .env.runner}
+      GITEA_RUNNER_REGISTRATION_TOKEN: ${GITEA_RUNNER_REGISTRATION_TOKEN:?Set GITEA_RUNNER_REGISTRATION_TOKEN in .env.runner}
+      GITEA_RUNNER_NAME: ${GITEA_RUNNER_NAME:-local-ansible-runner}
+      GITEA_RUNNER_LABELS: ${GITEA_RUNNER_LABELS:-ubuntu-latest:docker://node:20-bookworm}
+    volumes:
+      - ./data:/data
+      - /var/run/docker.sock:/var/run/docker.sock
+    extra_hosts:
+      - host.docker.internal:host-gateway

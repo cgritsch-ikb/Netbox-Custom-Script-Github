@@ -39,17 +39,32 @@ ansible-playbook -i localhost, playbooks/generate_cpe_gin_config.yml \
   -e netbox_device_role=mein-rollen-slug
 ```
 
-## Manuell mit Gitea Actions ausführen
+## Lokalen Gitea Action Runner bereitstellen
 
-In den Repository-Einstellungen unter **Actions → Secrets** die Secrets
-`NETBOX_API` (NetBox-URL) und `NETBOX_TOKEN` (API-Token mit Leserechten)
-hinterlegen. Danach unter **Actions** den Workflow **Generate Cisco
-configurations** auswählen und über **Run workflow** starten.
+Der Compose-Stack unter `gitea-runner/` installiert einen selbst gehosteten
+`act_runner` als separaten Dienst; er ist kein Workflow für dieses Repository.
+Die Dateien auf den Docker-Host kopieren, auf dem der Runner laufen soll, und
+dort zunächst die Vorlage anpassen:
 
-Die erzeugten Konfigurationen stehen nach erfolgreichem Lauf als Artefakt
-`generated-cisco-configs` für sieben Tage zum Download bereit. Der Gitea-Runner
-muss der NetBox-TLS-Zertifikatskette vertrauen; es werden keine Änderungen an
-NetBox oder Netzwerkgeräten vorgenommen.
+```bash
+cp gitea-runner/.env.example .env.runner
+```
+
+In `.env.runner` `GITEA_INSTANCE_URL` auf die aus dem Runner-Container
+erreichbare Gitea-URL setzen und `GITEA_RUNNER_REGISTRATION_TOKEN` mit dem in
+Gitea für den Runner erzeugten Registrierungstoken ersetzen. Für Gitea auf dem
+gleichen Docker-Host funktioniert üblicherweise die voreingestellte URL; bei
+anderer Netzwerktopologie muss eine erreichbare URL eingetragen werden.
+
+Anschließend den Runner starten:
+
+```bash
+docker compose --env-file .env.runner -f gitea-runner/docker-compose.yml up -d
+```
+
+Der Runner verwendet den Docker-Socket des Hosts, um Job-Container zu starten.
+Das gibt Jobs weitreichenden Zugriff auf den Docker-Host; daher nur für
+vertrauenswürdige Workflows und Repositories verwenden.
 
 Ausgaben werden unter `ansible/configs/generated/<gerätename>.cfg` gespeichert.
 Alle API-Seiten für Geräte, Interfaces und IP-Adressen werden berücksichtigt.

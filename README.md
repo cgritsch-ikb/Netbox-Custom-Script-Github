@@ -22,8 +22,7 @@ python -m pip install netaddr
 
 Der API-Token benötigt Leserechte auf Geräte, Interfaces und IP-Adressen
 einschließlich der zugeordneten Tags.
-TLS-Zertifikatsprüfungen sind eingeschaltet; bei einer internen CA muss deren
-Zertifikat auf dem Ansible-Controller vertrauenswürdig installiert sein.
+TLS-Zertifikate der NetBox-API werden nicht überprüft.
 
 ```bash
 export NETBOX_API="https://netbox.example.com"

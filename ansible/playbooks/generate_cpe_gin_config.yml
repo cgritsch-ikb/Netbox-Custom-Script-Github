@@ -9,7 +9,7 @@
     netbox_url: "{{ lookup('env', 'NETBOX_API') | regex_replace('/+$', '') }}"
     netbox_api_token: "{{ lookup('env', 'NETBOX_TOKEN') }}"
     netbox_device_role: cpe-gin
-    netbox_validate_certs: true
+    netbox_validate_certs: false
     generate_management_loopback: false
 
   tasks:

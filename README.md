@@ -39,6 +39,18 @@ ansible-playbook -i localhost, playbooks/generate_cpe_gin_config.yml \
   -e netbox_device_role=mein-rollen-slug
 ```
 
+## Manuell mit Gitea Actions ausführen
+
+In den Repository-Einstellungen unter **Actions → Secrets** die Secrets
+`NETBOX_API` (NetBox-URL) und `NETBOX_TOKEN` (API-Token mit Leserechten)
+hinterlegen. Danach unter **Actions** den Workflow **Generate Cisco
+configurations** auswählen und über **Run workflow** starten.
+
+Die erzeugten Konfigurationen stehen nach erfolgreichem Lauf als Artefakt
+`generated-cisco-configs` für sieben Tage zum Download bereit. Der Gitea-Runner
+muss der NetBox-TLS-Zertifikatskette vertrauen; es werden keine Änderungen an
+NetBox oder Netzwerkgeräten vorgenommen.
+
 Ausgaben werden unter `ansible/configs/generated/<gerätename>.cfg` gespeichert.
 Alle API-Seiten für Geräte, Interfaces und IP-Adressen werden berücksichtigt.
 IPv4-Adressen werden mit Netzmaske ausgegeben, weitere IPv4-Adressen desselben
